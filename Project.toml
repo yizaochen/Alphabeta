@@ -1,0 +1,9 @@
+name = "Alphabeta"
+uuid = "1981c01b-18a7-44d8-b572-49586e674f9d"
+authors = ["yizaochen <yizaochen@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+Fretem = "e84e15ef-c9df-489c-8bae-19309071f75f"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
