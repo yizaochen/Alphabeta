@@ -14,3 +14,6 @@ Foward-backward algorithm on FRET
 ### EM
 `notebooks/EM_1.ipynb`
 
+### Assemble Gaussian by Eigenvectors
+`notebooks/assemble_gaussian_test.ipynb`
+
