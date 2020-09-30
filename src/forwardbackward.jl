@@ -1,4 +1,4 @@
-using Fretem, LinearAlgebra, SparseArrays
+using Fretem, LinearAlgebra, SparseArrays, PhotonOperator
 include("initialization.jl")
 
 

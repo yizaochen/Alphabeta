@@ -1,6 +1,12 @@
 # Alphabeta
 Foward-backward algorithm on FRET
 
+# Create a virtual environment
+`conda create --name Alphabeta python=3.8`
+
+# Activate virtual environment
+`conda activate Alphabeta`
+
 # Protocol
 ### Check grid size of FEM
 `notebooks/FEM_grid_size.ipynb`

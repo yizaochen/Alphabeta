@@ -5,6 +5,10 @@ version = "0.1.0"
 
 [deps]
 Fretem = "e84e15ef-c9df-489c-8bae-19309071f75f"
+IJulia = "7073ff75-c697-5162-941a-fcdaad2a7d2a"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+PhotonOperator = "d1c41796-f82c-41f5-aae1-651bb94e9cb2"
+PkgTemplates = "14b8a8f1-9102-5b29-a752-f990bacb7fe1"
+Potential = "113ff972-b853-4846-a365-ec05e33f53ce"
 PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
