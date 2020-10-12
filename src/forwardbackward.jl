@@ -20,11 +20,12 @@ end
 
 
 function forward(alpha_mat, atemp, tau, x_record, LQ, Qx, dt, xref, e_norm, interpo_xs, Np, w0, Anorm_vec)
+    k_photon = 3 # unit: kcal/mol/angstrom^2
     expLQDT = exp.(-LQ .* dt)
     alpha_mat[:, 1] = atemp
     for alpha_idx in 1:tau
         y = x_record[alpha_idx+1]
-        photon_mat = get_photon_matrix(y, xref, e_norm, interpo_xs, Np, w0)
+        photon_mat = get_photon_matrix_gaussian(y, xref, e_norm, interpo_xs, Np, w0, k_photon)
 
         # < alpha | exp(-H dt)
         prev_ahat_edt = expLQDT .* atemp
@@ -54,6 +55,7 @@ end
 
 
 function backward(LQ, dt, Nv, beta_mat, btemp, tau, x_record, alpha_mat, xref, e_norm, interpo_xs, Np, w0, Qx, Anorm_vec)
+    k_photon = 3 # unit: kcal/mol/angstrom^2
     LQ_diff_ij = get_LQ_diff_ij(Nv, LQ) # Eq. (63) in JPCB 2013
 
     expLQDT = exp.(-LQ .* dt)
@@ -65,7 +67,7 @@ function backward(LQ, dt, Nv, beta_mat, btemp, tau, x_record, alpha_mat, xref, e
     exp_ab_mat = zeros(Nv,Nv)
     for beta_idx in tau:-1:1
         y = x_record[beta_idx+1]
-        photon_mat = get_photon_matrix(y, xref, e_norm, interpo_xs, Np, w0)
+        photon_mat = get_photon_matrix_gaussian(y, xref, e_norm, interpo_xs, Np, w0, k_photon)
 
         psi_photon_psi = Qx' * photon_mat * Qx
         btemp = psi_photon_psi * btemp
