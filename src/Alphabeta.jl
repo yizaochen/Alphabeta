@@ -4,6 +4,10 @@ module Alphabeta
 
     include("forwardbackward.jl")
     export get_alpha_t0, get_beta_t_tau, forward_backward
+
+    include("abruptdetect.jl")
+    export detect_abrupt
+
     """
     proj_alpha_from_eigenspace_to_xspace(Qx, alpha)
 
