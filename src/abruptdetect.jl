@@ -31,14 +31,15 @@ function second_derivative(x::Array{Float64,1}, y::Array{Float64,1}, N::Int64, e
 end
 
 function get_loc_number_of_abrupt(y::Array{Float64,1})
+    threshold = 1.
     y = abs.(y)
-    idx_larger_than_1 = findall(x -> x>=1, y)
-    return length(idx_array), idx_larger_than_1
+    idx_larger_than_1 = findall(x -> x>=threshold, y)
+    return length(idx_larger_than_1), idx_larger_than_1
 end
 
 function detect_abrupt(x::Array{Float64,1}, y::Array{Float64,1}, N::Int64, e_norm::Float64)
     second_deriv = second_derivative(x, y, N, e_norm)
-    n_larger_than_1, idx_larger_than_1 = get_loc_number_of_abrupt(y)
+    n_larger_than_1, idx_larger_than_1 = get_loc_number_of_abrupt(second_deriv)
     if n_larger_than_1 > 0
         return true, idx_larger_than_1
     else

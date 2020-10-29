@@ -2,7 +2,7 @@ using Fretem, LinearAlgebra, SparseArrays, PhotonOperator
 include("initialization.jl")
 
 
-function initialize(Nh, Np, xratio, xavg)
+function initialize(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64)
     x, w, Ldx, L = getLagrange(Np, xratio/Nh)
     e_norm = x[end] - x[1]
     interpo_xs = x .+ x[end]
@@ -11,7 +11,7 @@ function initialize(Nh, Np, xratio, xavg)
 end
 
 
-function get_mat_vec(Nv, tau)
+function get_mat_vec(Nv::Int64, tau::Int64)
     alpha_mat = zeros(Nv,tau+1)
     beta_mat = zeros(Nv,tau+1)
     Anorm_vec = ones(1,tau+2)
@@ -19,7 +19,9 @@ function get_mat_vec(Nv, tau)
 end
 
 
-function forward(alpha_mat, atemp, tau, x_record, LQ, Qx, dt, xref, e_norm, interpo_xs, Np, w0, Anorm_vec)
+function forward(alpha_mat::Array{Float64,2}, atemp::Array{Float64,1}, tau::Int64, x_record::Array{Float64,2}, 
+    LQ::Array{Float64,1}, Qx::Array{Float64,2}, dt::Float64, xref::Array{Float64,2}, e_norm::Float64, 
+    interpo_xs::Array{Float64,1}, Np::Int64,  w0::Array{Float64,2}, Anorm_vec::Array{Float64,2})
     k_photon = 3 # unit: kcal/mol/angstrom^2
     expLQDT = exp.(-LQ .* dt)
     alpha_mat[:, 1] = atemp
@@ -44,7 +46,7 @@ function forward(alpha_mat, atemp, tau, x_record, LQ, Qx, dt, xref, e_norm, inte
 end
 
 
-function get_LQ_diff_ij(Nv, LQ)
+function get_LQ_diff_ij(Nv::Int64, LQ::Array{Float64,1})
     LQ_diff_ij = zeros(Nv,Nv)
     for i in 1:Nv
         LQ_diff_ij[i,:] = 1 ./ (LQ .- LQ[i])
@@ -54,7 +56,9 @@ function get_LQ_diff_ij(Nv, LQ)
 end
 
 
-function backward(LQ, dt, Nv, beta_mat, btemp, tau, x_record, alpha_mat, xref, e_norm, interpo_xs, Np, w0, Qx, Anorm_vec)
+function backward(LQ::Array{Float64,1}, dt::Float64, Nv::Int64, beta_mat::Array{Float64,2}, btemp::Array{Float64,1},
+    tau::Int64, x_record::Array{Float64,2}, alpha_mat::Array{Float64,2}, xref::Array{Float64,2}, e_norm::Float64,
+    interpo_xs::Array{Float64,1}, Np::Int64, w0::Array{Float64,2}, Qx::Array{Float64,2}, Anorm_vec::Array{Float64,2})
     k_photon = 3 # unit: kcal/mol/angstrom^2
     LQ_diff_ij = get_LQ_diff_ij(Nv, LQ) # Eq. (63) in JPCB 2013
 
@@ -84,7 +88,8 @@ function backward(LQ, dt, Nv, beta_mat, btemp, tau, x_record, alpha_mat, xref, e
 end
 
 
-function forward_backward(Nh, Np, xratio, xavg, peq, D, Nv, tau, x_record, dt)
+function forward_backward(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, peq::Array{Float64,2}, D::Float64, 
+    Nv::Int64, tau::Int64, x_record::Array{Float64,2}, dt::Float64)
     e_norm, interpo_xs, xref, w0 = initialize(Nh, Np, xratio, xavg)
     LQ, Qx, rho = fem_solve_eigen_by_pref(Nh, Np, xratio, xavg, peq, D, Nv)
 
