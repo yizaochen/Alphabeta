@@ -3,7 +3,7 @@ module Alphabeta
     export get_alpha_t0_x_by_V0_Veq, get_alpha_by_proj_alphax_to_Qx, proj_vector_from_eigenspace_to_xspace, em_iteration
 
     include("forwardbackward.jl")
-    export get_alpha_t0, get_beta_t_tau, forward_backward
+    export get_alpha_t0, get_beta_t_tau, forward_backward, get_all_likelihood
 
     include("abruptdetect.jl")
     export detect_abrupt

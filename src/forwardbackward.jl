@@ -115,3 +115,79 @@ function forward_backward(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, peq:
     peq_new_normalize = peq_new ./ sum(w0 .* peq_new)
     return peq_new_normalize
 end
+
+
+function backward_with_betamatrix(LQ::Array{Float64,1}, dt::Float64, Nv::Int64, beta_mat::Array{Float64,2}, 
+    btemp::Array{Float64,1}, tau::Int64, x_record::Array{Float64,2}, alpha_mat::Array{Float64,2}, 
+    xref::Array{Float64,2},e_norm::Float64, interpo_xs::Array{Float64,1}, Np::Int64, w0::Array{Float64,2}, 
+    Qx::Array{Float64,2}, Anorm_vec::Array{Float64,2})
+    k_photon = 3 # unit: kcal/mol/angstrom^2
+    LQ_diff_ij = get_LQ_diff_ij(Nv, LQ) # Eq. (63) in JPCB 2013
+
+    expLQDT = exp.(-LQ .* dt)
+    someones = ones(1,Nv)
+    eLQDT = expLQDT * someones
+
+    #btemp = btemp ./ Anorm_vec[tau+2] ./ Anorm_vec[tau+1]
+    beta_mat[:, end] = btemp
+    exp_ab_mat = zeros(Nv,Nv)
+    for beta_idx in tau:-1:1
+        y = x_record[beta_idx+1]
+        photon_mat = get_photon_matrix_gaussian(y, xref, e_norm, interpo_xs, Np, w0, k_photon)
+
+        psi_photon_psi = Qx' * photon_mat * Qx
+        btemp = psi_photon_psi * btemp
+        
+        # Eq. (64) and Eq. (63)
+        outer= alpha_mat[:, beta_idx] * btemp'
+        exp_ab_mat = exp_ab_mat .+ outer .* ( diagm(expLQDT * dt) + LQ_diff_ij .* (eLQDT-eLQDT'))
+        
+        btemp = expLQDT .* btemp
+        btemp = btemp / Anorm_vec[beta_idx]
+        beta_mat[:, beta_idx] = btemp
+    end
+    return exp_ab_mat, beta_mat
+end
+
+
+function get_all_likelihood(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, peq::Array{Float64,2}, D::Float64, 
+    Nv::Int64, tau::Int64, x_record::Array{Float64,2}, dt::Float64)
+    e_norm, interpo_xs, xref, w0 = initialize(Nh, Np, xratio, xavg)
+    LQ, Qx, rho = fem_solve_eigen_by_pref(Nh, Np, xratio, xavg, peq, D, Nv)
+
+    alpha_t0 = get_alpha_t0(w0, rho, Qx, Nv)
+    beta_t_tau = get_beta_t_tau(w0, rho, Qx, Nv)
+    atemp = alpha_t0
+    btemp = beta_t_tau
+
+    alpha_mat, beta_mat, Anorm_vec = get_mat_vec(Nv, tau)
+
+    Anorm_vec[1] = norm(alpha_t0)
+
+    alpha_mat, Anorm_vec, atemp = forward(alpha_mat, atemp, tau, x_record, LQ, Qx, dt, xref, e_norm, interpo_xs, Np, w0, Anorm_vec)
+
+    Anorm_vec[tau+2] = sum(btemp .* atemp)
+    atemp = atemp ./ Anorm_vec[end]
+    
+    exp_ab_mat, beta_mat = backward_with_betamatrix(LQ, dt, Nv, beta_mat, btemp, tau, x_record, alpha_mat, xref, e_norm, interpo_xs, Np, w0, Qx, Anorm_vec)
+
+    #log_likelihood = -sum(log.(Anorm_vec)) # Eq. (41)
+    #likelihood = exp(log_likelihood) # Positive overflow....
+    #Q = get_Q(LQ, dt, alpha_mat, beta_mat, tau)
+    #S = log_likelihood - Q
+    return Anorm_vec
+end
+
+
+function get_Q(LQ::Array{Float64,1}, dt::Float64, alpha_mat::Array{Float64,2}, beta_mat::Array{Float64,2}, tau::Int64)
+    container = zeros(1, tau)
+    expLQDT = exp.(-LQ .* dt)
+    for alpha_idx in 1:tau
+        atemp = alpha_mat[:, alpha_idx]
+        btemp = beta_mat[:, alpha_idx+1]
+        prev_ahat_edt = expLQDT .* atemp
+        container[alpha_idx] = dot(prev_ahat_edt, btemp)
+    end
+    #return sum(container) / likelihood
+    return sum(container)
+end
