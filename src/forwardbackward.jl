@@ -10,7 +10,6 @@ function initialize(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64)
     return e_norm, interpo_xs, xref, w0
 end
 
-
 function get_mat_vec(Nv::Int64, tau::Int64)
     alpha_mat = zeros(Nv,tau+1)
     beta_mat = zeros(Nv,tau+1)
@@ -18,6 +17,21 @@ function get_mat_vec(Nv::Int64, tau::Int64)
     return alpha_mat, beta_mat, Anorm_vec
 end
 
+function get_weight_Qx(N::Int64, Nv::Int64, w0::Array{Float64,2}, Qx::Array{Float64,2})
+    weight_Qx = zeros(N, Nv)
+    for i = 1:Nv
+        weight_Qx[:, i] = w0 .* Qx[:, i]
+    end
+    return weight_Qx
+end
+
+function get_alpha_hat_e_delta_t(Lambdas::Array{Float64,1}, delta_t::Float64, alpha_hat::Array{Float64,2})
+    expLQDT = exp.(-Lambdas .* delta_t)
+    alpha_hat_e_delta_t = expLQDT .* alpha_hat
+    sum_c2_c72_square = sum(alpha_hat_e_delta_t[2:end].^2)
+    alpha_hat_e_delta_t[1] = sqrt(1 - sum_c2_c72_square)
+    return alpha_hat_e_delta_t
+end
 
 function forward(alpha_mat::Array{Float64,2}, atemp::Array{Float64,1}, tau::Int64, x_record::Array{Float64,2}, 
     LQ::Array{Float64,1}, Qx::Array{Float64,2}, dt::Float64, xref::Array{Float64,2}, e_norm::Float64, 

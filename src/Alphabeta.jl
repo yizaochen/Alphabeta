@@ -3,7 +3,7 @@ module Alphabeta
     export get_alpha_t0_x_by_V0_Veq, get_alpha_by_proj_alphax_to_Qx, proj_vector_from_eigenspace_to_xspace, em_iteration
 
     include("forwardbackward.jl")
-    export get_alpha_t0, get_beta_t_tau, forward_backward, get_all_likelihood
+    export get_weight_Qx, get_alpha_t0, get_alpha_t0_x_square_norm, get_alpha_hat_e_delta_t, get_beta_t_tau, get_alpha_t0_x_square_norm, forward_backward, get_all_likelihood
 
     include("abruptdetect.jl")
     export detect_abrupt
@@ -13,6 +13,9 @@ module Alphabeta
 
     include("evaluation.jl")
     export iteration_evaluation
+
+    include("plot_util.jl")
+    export plot_alpha_t0, plot_alpha_t0_e_dt, plot_photon_mat, plot_alpha_hat, plot_alpha_hat_e_dt
 
     using Printf, JLD
 
