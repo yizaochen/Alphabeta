@@ -17,6 +17,43 @@ function plot_alpha_t0(xref::Array{Float64,2}, V_eq::Array{Float64,2}, k_ref::Fl
     return fig, axes
 end
 
+function plot_beta_T(xref::Array{Float64,2}, beta_T::Array{Float64,2})
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 4))
+
+    photon_id = 4
+    ax = axes[1]
+    ax = plot_beta_T_x(ax, xref, photon_id)
+
+    ax = axes[2]
+    ax = barplot_beta_T(ax, beta_T)
+    return fig, axes
+end
+
+function plot_beta_T_minus_1(y_beta::Array{Float64,2}, e_delta_t_y_beta::Array{Float64,2}, photon_id::Int64, xref::Array{Float64,2}, Qx::Array{Float64,2})
+    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(12, 4))
+
+    ax = axes[1]
+    ax = barplot_y_beta(ax, y_beta, photon_id)
+
+    ax = axes[2]
+    ax = barplot_beta(ax, e_delta_t_y_beta, photon_id-1)
+
+    ax = axes[3]
+    ax = plot_beta_x(ax, xref, e_delta_t_y_beta, Qx, photon_id-1)
+    return fig, axes
+end
+
+function plot_beta_hat_posterior(xref::Array{Float64,2}, beta_hat::Array{Float64,2}, posterior::Array{Float64,2}, photon_id::Int64, w0::Array{Float64,2}, y::Float64)
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 4))
+
+    ax = axes[1]
+    ax = barplot_beta_hat(ax, beta_hat, photon_id)
+
+    ax = axes[2]
+    ax = plot_posterior(ax, xref, posterior, photon_id, w0, y)
+    return fig, axes
+end
+
 function plot_alpha_t0_e_dt(xref::Array{Float64,2}, alpha_t0_e_delta_t::Array{Float64,2}, Qx::Array{Float64,2}, rho_eq::Array{Float64,2}, w0::Array{Float64,2})
     fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(12,4))
 
@@ -114,6 +151,48 @@ function barplot_alpha_hat(ax::PyCall.PyObject, alpha_hat::Array{Float64,2}, pho
     return ax
 end
 
+function barplot_y_beta(ax::PyCall.PyObject, y_beta::Array{Float64,2}, photon_id::Int64)
+    xarray = 1:72
+    xticks = 1:5:72
+    ax.plot(xarray, y_beta, "b.")
+    ax.vlines(xarray, ymin=0, ymax=y_beta)
+    ax.set_xticks(xticks)
+    ylabel = @sprintf "\$\\langle \\psi_i | \\mathbf{y}_{%d} |\\beta_{t_{%d}} \\rangle\$" photon_id photon_id
+    ax.set_ylabel(ylabel)
+    ax.set_xlabel("\$ i \$, the index of eigenvector(\$ \\psi_i\$)")
+    title = @sprintf "\$ \\Vert | \\mathbf{y}_{%d} | \\beta_{t_{%d}} \\rangle \\Vert = %.3f \$" photon_id  photon_id norm(y_beta)
+    ax.set_title(title)
+    return ax
+end
+
+function barplot_beta(ax::PyCall.PyObject, beta::Array{Float64,2}, photon_id::Int64)
+    xarray = 1:72
+    xticks = 1:5:72
+    ax.plot(xarray, beta, "b.")
+    ax.vlines(xarray, ymin=0, ymax=beta)
+    ax.set_xticks(xticks)
+    ylabel = @sprintf "\$\\langle \\psi_i |\\beta_{t_{%d}} \\rangle\$" photon_id 
+    ax.set_ylabel(ylabel)
+    ax.set_xlabel("\$ i \$, the index of eigenvector(\$ \\psi_i\$)")
+    title = @sprintf "\$ \\Vert \\beta_{t_{%d}} \\Vert = %.3f \$" photon_id norm(beta)
+    ax.set_title(title)
+    return ax
+end
+
+function barplot_beta_hat(ax::PyCall.PyObject, beta_hat::Array{Float64,2}, photon_id::Int64)
+    xarray = 1:72
+    xticks = 1:5:72
+    ax.plot(xarray, beta_hat, "b.")
+    ax.vlines(xarray, ymin=0, ymax=beta_hat)
+    ax.set_xticks(xticks)
+    ylabel = @sprintf "\$\\langle \\psi_i |\\hat{\\beta}_{t_{%d}} \\rangle\$" photon_id-1 
+    ax.set_ylabel(ylabel)
+    ax.set_xlabel("\$ i \$, the index of eigenvector(\$ \\psi_i\$)")
+    title = @sprintf "\$ \\Vert \\hat{\\beta}_{t_{%d}} \\Vert = %.3f \$" photon_id-1 norm(beta_hat)
+    ax.set_title(title)
+    return ax
+end
+
 function barplot_alpha_hat_edt(ax::PyCall.PyObject, alpha_hat_e_delta_t::Array{Float64,2}, photon_id::Int64, delta_t::Float64)
     xarray = 1:72
     xticks = 1:5:72
@@ -125,6 +204,30 @@ function barplot_alpha_hat_edt(ax::PyCall.PyObject, alpha_hat_e_delta_t::Array{F
     ax.set_xlabel("\$ i \$, the index of eigenvector(\$ \\psi_i\$)")
     title = @sprintf "\$  \\Vert \\langle \\hat{\\alpha}_{t_{%d}} | e^{-\\mathbf{H} \\Delta t}|  \\Vert =%.3f \$  \$\\Delta t=%.0E\$s" photon_id norm(alpha_hat_e_delta_t) delta_t
     ax.set_title(title)
+    return ax
+end
+
+function plot_beta_x(ax::PyCall.PyObject, xref::Array{Float64,2}, beta::Array{Float64,2}, Qx::Array{Float64,2}, photon_id::Int64)
+    beta_x = Qx * beta
+    ax.plot(xref, beta_x)
+    xlabel = @sprintf "\$ x_{%d} \$ (\$ \\AA \$)" photon_id
+    ax.set_xlabel(xlabel)
+    ylabel = @sprintf "\$\\langle x_{%d} | \\beta_{t_{%d}} \\rangle\$" photon_id photon_id
+    ax.set_ylabel(ylabel)
+    return ax
+end
+
+function plot_posterior(ax::PyCall.PyObject, xref::Array{Float64,2}, posterior::Array{Float64,2}, photon_id::Int64, w0::Array{Float64,2}, y::Float64)
+    ax.plot(xref, posterior)
+    xlabel = @sprintf "\$ x_{%d} \$ (\$ \\AA \$)" photon_id-1
+    ax.set_xlabel(xlabel)
+    ylabel = @sprintf "\$p(x_{%d}|\\mathbf{y})\$" photon_id-1
+    ax.set_ylabel(ylabel)
+    label = @sprintf "\$y_{%d}=%.3f\$" photon_id-1 y
+    ax.axvline(y, color="red", alpha=0.3, label=label)
+    title = @sprintf "\$\\int p(x_{%d}|\\mathbf{y}) dx_{%d} = %.3f\$" photon_id-1 photon_id-1 sum(w0 .* posterior)
+    ax.set_title(title)
+    ax.legend()
     return ax
 end
 
@@ -163,6 +266,16 @@ function plot_alpha_hat_e_dt_x(ax::PyCall.PyObject, xref::Array{Float64,2}, alph
     ylabel = @sprintf "\$\\langle \\hat{\\alpha}_{t_{%d}} | e^{-\\mathbf{H} \\Delta t}| x_{%d} \\rangle\$" photon_id next_photon_id
     ax.set_ylabel(ylabel)
     ax.legend()
+    return ax
+end
+
+function plot_beta_T_x(ax::PyCall.PyObject, xref::Array{Float64,2}, photon_id::Int64)
+    ax.plot(xref, ones(length(xref)))
+    xlabel = @sprintf "\$ x \$ (\$ \\AA \$)"
+    ax.set_xlabel(xlabel)
+    ylabel = @sprintf "\$\\langle  x | \\beta_{t_{%d}} \\rangle\$" photon_id
+    ax.set_ylabel(ylabel)
+    ax.set_ylim(0, 2)
     return ax
 end
 
@@ -322,5 +435,18 @@ function barplot_alpha_t0(ax::PyCall.PyObject, alpha_t0::Array{Float64,2})
     ax.set_ylabel("\$\\langle \\alpha_{t_0} | \\psi_i \\rangle\$", fontsize=12)
     ax.set_xlabel("\$ i \$, the index of eigenvector(\$ \\psi_i\$)", fontsize=12)
     plt.tight_layout()
+    return ax
+end
+
+function barplot_beta_T(ax::PyCall.PyObject, beta_T::Array{Float64,2})
+    xarray = 1:72
+    xticks = 1:5:72
+    ax.plot(xarray, beta_T, "b.")
+    ax.vlines(xarray, ymin=0, ymax=beta_T)
+    ax.set_xticks(xticks)
+    ax.set_ylabel("\$\\langle \\psi_i | \\beta_{t_4} \\rangle\$", fontsize=12)
+    ax.set_xlabel("\$ i \$, the index of eigenvector(\$ \\psi_i\$)", fontsize=12)
+    title = @sprintf "\$  \\Vert \\beta_{t_4} \\Vert =%.3f \$" norm(beta_T)
+    ax.set_title(title)
     return ax
 end

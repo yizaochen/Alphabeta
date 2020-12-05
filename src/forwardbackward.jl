@@ -33,6 +33,30 @@ function get_alpha_hat_e_delta_t(Lambdas::Array{Float64,1}, delta_t::Float64, al
     return alpha_hat_e_delta_t
 end
 
+function get_e_delta_t_y_beta(Lambdas::Array{Float64,1}, delta_t::Float64, y_beta::Array{Float64,2})
+    y_beta_norm = norm(y_beta)
+    expLQDT = exp.(-Lambdas .* delta_t)
+    e_delt_t_y_beta = expLQDT .* y_beta
+    sum_c2_c72_square = sum(e_delt_t_y_beta[2:end].^2)
+    e_delt_t_y_beta[1] = sqrt(y_beta_norm^2 - sum_c2_c72_square)
+    return e_delt_t_y_beta
+end
+
+function get_normalized_beta(e_delta_t_y_beta_hat::Array{Float64,2}, photon_id::Int64, scale_factor_array::Array{Float64,1}, Qx::Array{Float64,2}, alpha_hat::Array{Float64,2}, w0::Array{Float64,2})
+    beta_hat_first = e_delta_t_y_beta_hat ./ scale_factor_array[photon_id]
+    beta_hat_first_square = (Qx * beta_hat_first) .^ 2
+    alpha_hat_x_square = (Qx * alpha_hat) .^ 2
+    return beta_hat_first ./ sqrt(sum(w0 .* alpha_hat_x_square .* beta_hat_first_square))
+end
+
+function get_posterior(alpha_hat::Array{Float64,2}, beta_hat::Array{Float64,2}, Qx::Array{Float64,2})
+    alpha_hat_x = Qx * alpha_hat
+    alpha_hat_x_square = alpha_hat_x .^ 2
+    beta_hat_x = Qx * beta_hat
+    beta_hat_x_square = beta_hat_x .^ 2
+    return alpha_hat_x_square .* beta_hat_x_square
+end
+
 function forward(alpha_mat::Array{Float64,2}, atemp::Array{Float64,1}, tau::Int64, x_record::Array{Float64,2}, 
     LQ::Array{Float64,1}, Qx::Array{Float64,2}, dt::Float64, xref::Array{Float64,2}, e_norm::Float64, 
     interpo_xs::Array{Float64,1}, Np::Int64,  w0::Array{Float64,2}, Anorm_vec::Array{Float64,2})
@@ -59,7 +83,6 @@ function forward(alpha_mat::Array{Float64,2}, atemp::Array{Float64,1}, tau::Int6
     return alpha_mat, Anorm_vec, atemp
 end
 
-
 function get_LQ_diff_ij(Nv::Int64, LQ::Array{Float64,1})
     LQ_diff_ij = zeros(Nv,Nv)
     for i in 1:Nv
@@ -68,7 +91,6 @@ function get_LQ_diff_ij(Nv::Int64, LQ::Array{Float64,1})
     end
     return LQ_diff_ij
 end
-
 
 function backward(LQ::Array{Float64,1}, dt::Float64, Nv::Int64, beta_mat::Array{Float64,2}, btemp::Array{Float64,1},
     tau::Int64, x_record::Array{Float64,2}, alpha_mat::Array{Float64,2}, xref::Array{Float64,2}, e_norm::Float64,
