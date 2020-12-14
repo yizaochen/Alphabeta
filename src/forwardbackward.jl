@@ -12,7 +12,7 @@ end
 
 function get_mat_vec(Nv::Int64, tau::Int64)
     alpha_mat = zeros(Nv,tau+1)
-    beta_mat = zeros(Nv,tau+1)
+    beta_mat = zeros(Nv,tau)
     Anorm_vec = ones(1,tau)
     return alpha_mat, beta_mat, Anorm_vec
 end
@@ -49,7 +49,22 @@ function get_e_delta_t_y_beta(Lambdas::Array{Float64,1}, delta_t::Float64, y_bet
     return e_delt_t_y_beta
 end
 
+function get_e_delta_t_y_beta_v1(expLQDT::Array{Float64,1}, y_beta::Array{Float64,2})
+    y_beta_norm = norm(y_beta)
+    e_delt_t_y_beta = expLQDT .* y_beta
+    sum_c2_c72_square = sum(e_delt_t_y_beta[2:end].^2)
+    e_delt_t_y_beta[1] = sqrt(y_beta_norm^2 - sum_c2_c72_square)
+    return e_delt_t_y_beta
+end
+
 function get_normalized_beta(e_delta_t_y_beta_hat::Array{Float64,2}, photon_id::Int64, scale_factor_array::Array{Float64,1}, Qx::Array{Float64,2}, alpha_hat::Array{Float64,2}, w0::Array{Float64,2})
+    beta_hat_first = e_delta_t_y_beta_hat ./ scale_factor_array[photon_id]
+    beta_hat_first_square = (Qx * beta_hat_first) .^ 2
+    alpha_hat_x_square = (Qx * alpha_hat) .^ 2
+    return beta_hat_first ./ sqrt(sum(w0 .* alpha_hat_x_square .* beta_hat_first_square))
+end
+
+function get_normalized_beta(e_delta_t_y_beta_hat::Array{Float64,2}, photon_id::Int64, scale_factor_array::Array{Float64,2}, Qx::Array{Float64,2}, alpha_hat::Array{Float64,1}, w0::Array{Float64,2})
     beta_hat_first = e_delta_t_y_beta_hat ./ scale_factor_array[photon_id]
     beta_hat_first_square = (Qx * beta_hat_first) .^ 2
     alpha_hat_x_square = (Qx * alpha_hat) .^ 2
@@ -90,7 +105,7 @@ function forward(alpha_mat::Array{Float64,2}, atemp::Array{Float64,1}, tau::Int6
     return alpha_mat, Anorm_vec, atemp
 end
 
-function forward_v1(alpha_mat::Array{Float64,2}, atemp::Array{Float64,1}, tau::Int64, x_record::Array{Float64,2}, 
+function forward_v1(alpha_mat::Array{Float64,2}, atemp::Array{Float64,2}, tau::Int64, x_record::Array{Float64,2}, 
     LQ::Array{Float64,1}, Qx::Array{Float64,2}, dt::Float64, xref::Array{Float64,2}, e_norm::Float64, 
     interpo_xs::Array{Float64,1}, Np::Int64,  w0::Array{Float64,2}, Anorm_vec::Array{Float64,2})
     k_photon = 3 # unit: kcal/mol/angstrom^2
@@ -154,32 +169,38 @@ function backward(LQ::Array{Float64,1}, dt::Float64, Nv::Int64, beta_mat::Array{
     return exp_ab_mat
 end
 
-function backward_v1(LQ::Array{Float64,1}, dt::Float64, Nv::Int64, beta_mat::Array{Float64,2}, btemp::Array{Float64,1},
+function backward_v1(Lambdas::Array{Float64,1}, dt::Float64, beta_mat::Array{Float64,2}, btemp::Array{Float64,2},
     tau::Int64, x_record::Array{Float64,2}, alpha_mat::Array{Float64,2}, xref::Array{Float64,2}, e_norm::Float64,
     interpo_xs::Array{Float64,1}, Np::Int64, w0::Array{Float64,2}, Qx::Array{Float64,2}, Anorm_vec::Array{Float64,2})
     k_photon = 3 # unit: kcal/mol/angstrom^2
-    LQ_diff_ij = get_LQ_diff_ij(Nv, LQ) # Eq. (63) in JPCB 2013
+    expLQDT = exp.(-Lambdas .* dt)
 
-    expLQDT = exp.(-LQ .* dt)
-    someones = ones(1,Nv)
-    eLQDT = expLQDT * someones
-
-    #btemp = btemp ./ Anorm_vec[tau+2] ./ Anorm_vec[tau+1]
-    beta_mat[:, end] = btemp
-    exp_ab_mat = zeros(Nv,Nv)
     for beta_idx in tau:-1:1
+        beta_mat[:, beta_idx] = btemp
+
         y = x_record[beta_idx+1]
         photon_mat = get_photon_matrix_gaussian(y, xref, e_norm, interpo_xs, Np, w0, k_photon)
         psi_photon_psi = Qx' * photon_mat * Qx
-        btemp = psi_photon_psi * btemp
-        
-        # Eq. (64) and Eq. (63)
-        outer= alpha_mat[:, beta_idx] * btemp'
-        exp_ab_mat = exp_ab_mat .+ outer .* ( diagm(expLQDT * dt) + LQ_diff_ij .* (eLQDT-eLQDT'))
-        
-        btemp = expLQDT .* btemp
-        btemp = btemp / Anorm_vec[beta_idx]
-        beta_mat[:, beta_idx] = btemp
+        y_btemp = psi_photon_psi * btemp
+
+        btemp = get_e_delta_t_y_beta_v1(expLQDT, y_btemp)
+
+        btemp = get_normalized_beta(btemp, beta_idx, Anorm_vec, Qx, alpha_mat[:, beta_idx+1], w0)        
+    end
+    return beta_mat
+end
+
+
+function get_exp_ab_mat(Lambdas::Array{Float64,1}, Nv::Int64, tau::Int64, alpha_mat::Array{Float64,2}, beta_mat::Array{Float64,2}, dt::Float64)
+    LQ_diff_ij = get_LQ_diff_ij(Nv, Lambdas) # Eq. (63) in JPCB 2013
+    expLQDT = exp.(-Lambdas .* dt)
+    someones = ones(1,Nv)
+    eLQDT = expLQDT * someones
+
+    exp_ab_mat = zeros(Nv,Nv)
+    for idx in 1:tau
+        outer= alpha_mat[:, idx] * beta_mat[:, idx]'
+        exp_ab_mat = exp_ab_mat .+ outer .* ( diagm(expLQDT * dt) + LQ_diff_ij .* (eLQDT-eLQDT')) # Eq. (64)
     end
     return exp_ab_mat
 end
@@ -188,18 +209,21 @@ end
 function forward_backward(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, peq::Array{Float64,2}, D::Float64, 
     Nv::Int64, tau::Int64, x_record::Array{Float64,2}, dt::Float64)
     e_norm, interpo_xs, xref, w0 = initialize(Nh, Np, xratio, xavg)
-    LQ, Qx, rho = fem_solve_eigen_by_pref(Nh, Np, xratio, xavg, peq, D, Nv)
+    Lambdas, Qx, rho = fem_solve_eigen_by_pref(Nh, Np, xratio, xavg, peq, D, Nv)
     N  = Nh*Np - Nh + 1 # Total number of nodes
     weight_Qx = get_weight_Qx(N, Nv, w0, Qx)
 
     alpha_mat, beta_mat, Anorm_vec = get_mat_vec(Nv, tau)
 
-    alpha_t0 = get_alpha_t0(weight_Qx, rho)
-    alpha_mat, Anorm_vec, atemp = forward_v1(alpha_mat, atemp, tau, x_record, LQ, Qx, dt, xref, e_norm, interpo_xs, Np, w0, Anorm_vec)
+    atemp = get_alpha_t0(weight_Qx, rho)
+    alpha_mat, Anorm_vec, atemp = forward_v1(alpha_mat, atemp, tau, x_record, Lambdas, Qx, dt, xref, e_norm, interpo_xs, Np, w0, Anorm_vec)
     log_likelihood = sum(log.(Anorm_vec)) # Eq. (41)
 
     btemp = get_beta_T(Nv, weight_Qx);
+    beta_mat = backward_v1(Lambdas, dt, beta_mat, btemp, tau, x_record, alpha_mat, xref, e_norm, interpo_xs, Np, w0, Qx, Anorm_vec)
     #exp_ab_mat = backward(LQ, dt, Nv, beta_mat, btemp, tau, x_record, alpha_mat, xref, e_norm, interpo_xs, Np, w0, Qx, Anorm_vec)
+
+    exp_ab_mat = get_exp_ab_mat(Lambdas, Nv, tau, alpha_mat, beta_mat, dt)
 
     # Eq. (72) and Eq. (78)
     peq_new = diag(Qx * exp_ab_mat * Qx')
