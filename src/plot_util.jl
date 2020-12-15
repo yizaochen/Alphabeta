@@ -324,7 +324,7 @@ function plot_alpha_hat_e_delta_t_x_square(ax::PyCall.PyObject, xref::Array{Floa
     ylabel = @sprintf "\$(\\langle \\hat{\\alpha}_{t_{%d}} | e^{-\\mathbf{H} \\Delta t}| x_{%d} \\rangle)^2\$" photon_id next_photon_id
     ax.set_ylabel(ylabel)
     ax.legend()
-    title = @sprintf "\$ \\sum_{k=1}^{193} w(x_k) \\hat{\\alpha}_{t_{%d}} | e^{-\\mathbf{H} \\Delta t}| x_k \\rangle)^2 = %.3f \$" photon_id  sum_alpha_hat_e_delta_t_x_square
+    title = @sprintf "\$ \\sum_{k=1}^{193} w(x_k) \\langle \\hat{\\alpha}_{t_{%d}} | e^{-\\mathbf{H} \\Delta t}| x_k \\rangle)^2 = %.3f \$" photon_id  sum_alpha_hat_e_delta_t_x_square
     ax.set_title(title)
     return ax
 end

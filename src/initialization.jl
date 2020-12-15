@@ -20,7 +20,7 @@ function get_alpha_t0_x_square_norm(alpha_t0::Array{Float64,2}, Qx::Array{Float6
 end
 
 function get_beta_t_tau(w0, beta_x, Qx, Nv)
-    beta = ones(Nv)
+    beta = ones(Nv,1)
     temp = w0 .* beta_x
     for idx_eigv in 1:Nv
         beta[idx_eigv] = sum(temp .* Qx[:, idx_eigv])
