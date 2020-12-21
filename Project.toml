@@ -4,6 +4,7 @@ authors = ["yizaochen <yizaochen@gmail.com>"]
 version = "0.1.0"
 
 [deps]
+Dierckx = "39dd38d3-220a-591b-8e3c-4c3a8c710a94"
 Fretem = "e84e15ef-c9df-489c-8bae-19309071f75f"
 IJulia = "7073ff75-c697-5162-941a-fcdaad2a7d2a"
 JLD = "4138dd39-2aa7-5051-a626-17a0bb65d9c8"
