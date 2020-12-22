@@ -9,7 +9,7 @@ module Alphabeta
     export detect_abrupt
 
     include("smooth.jl")
-    export smooth_psi
+    export smooth_psi, smooth_peq
 
     include("evaluation.jl")
     export iteration_evaluation
@@ -53,30 +53,37 @@ module Alphabeta
 
     function em_iteration(n_iteration::Int64, N::Int64, p0::Array{Float64,2}, 
         Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, D::Float64, Nv::Int64, tau::Int64,
-        y_record::Array{Float64,2}, save_freq::Float64, xref::Array{Float64,2}, e_norm::Float64, f_out::String)
+        y_record::Array{Float64,2}, save_freq::Float64, xref::Array{Float64,2}, e_norm::Float64, w0::Array{Float64,2}, f_out_pcontain::String, f_out_l_record::String)
+
         # Initailize container
         p_container = zeros(Float64, n_iteration+1, N)
+        log_likelihood_records = zeros(n_iteration+1)
         
         # Iteration of EM
         p_prev = p0  # initial guess
         p_container[1, :] = p0 # The first row in container is p0
         for iter_id = 1:n_iteration
-            println(iter_id)
+            println(@sprintf "Iteration-ID: %d" iter_id)
             # Every 5 iterations, check abrupt change and do smooth
             if iter_id % 5 == 0
                 abrupt_boolean, idx_larger_than_1 = detect_abrupt(xref[:,1], p_prev[:,1], N, e_norm)
-                p_prev[:,1] = smooth_psi(N, p_prev[:,1], abrupt_boolean, idx_larger_than_1, xref[:,1])
+                p_prev[:,1] = smooth_peq(N, p_prev[:,1], abrupt_boolean, w0, xref)
             end
-            p_em = forward_backward(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq)
+            p_em, log_likelihood = forward_backward_v2(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq)
             p_em = max.(p_em, 1e-10)   
             p_container[iter_id+1, :] = p_em    
             p_prev[:,1] = p_em
+            log_likelihood_records[iter_id] = log_likelihood
         end
         
         # Output
-        save(f_out, "p_container", p_container)
-        println(@sprintf "Write p_container to %s" f_out)
-        return p_container
+        save(f_out_pcontain, "p_container", p_container)
+        println(@sprintf "Write p_container to %s" f_out_pcontain)
+
+        save(f_out_l_record, "log_likelihood_records", log_likelihood_records)
+        println(@sprintf "Write log_likelihood_records to %s" f_out_l_record)
+
+        return p_container, log_likelihood_records
     end
     
 end
