@@ -1,4 +1,4 @@
-using Fretem, LinearAlgebra, SparseArrays, PhotonOperator
+using Fretem, LinearAlgebra, SparseArrays, PhotonOperator, Optim
 include("initialization.jl")
 
 
@@ -358,6 +358,55 @@ function forward_backward_v2(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, p
     return peq_new_normalize, log_likelihood
 end
 
+function get_loglikelihood(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, peq::Array{Float64,2}, D::Float64, 
+    Nv::Int64, tau::Int64, x_record::Array{Float64,2}, dt::Float64)
+    e_norm, interpo_xs, xref, w0 = initialize(Nh, Np, xratio, xavg)
+    Lambdas, Qx, rho = fem_solve_eigen_by_pref(Nh, Np, xratio, xavg, peq, D, Nv)
+    N  = Nh*Np - Nh + 1 # Total number of nodes
+    weight_Qx = get_weight_Qx(N, Nv, w0, Qx)
+
+    alpha_mat, beta_mat, Anorm_vec = get_mat_vec_v0(Nv, tau)
+
+    alpha_t0 = get_alpha_t0(weight_Qx, rho)
+    #beta_t_tau = get_beta_t_tau(w0, rho, Qx, Nv)
+    beta_t_tau = get_beta_T(Nv, weight_Qx);
+    atemp = alpha_t0
+    btemp = beta_t_tau
+
+    Anorm_vec[1] = norm(alpha_t0)
+
+    alpha_mat, Anorm_vec, atemp = forward_v2(alpha_mat, atemp, tau, x_record, Lambdas, Qx, dt, xref, e_norm, interpo_xs, Np, w0, Anorm_vec)
+    Anorm_vec[tau+2] = sum(btemp .* atemp)
+    atemp = atemp ./ Anorm_vec[end]
+    return sum(log.(Anorm_vec[2:tau+1])) # Eq. (41)
+end
+
+function optimize_D(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, peq::Array{Float64,2}, D_init::Float64, 
+    Nv::Int64, tau::Int64, x_record::Array{Float64,2}, dt::Float64)
+    function loglikelihood(D)
+        e_norm, interpo_xs, xref, w0 = initialize(Nh, Np, xratio, xavg)
+        Lambdas, Qx, rho = fem_solve_eigen_by_pref(Nh, Np, xratio, xavg, peq, D, Nv)
+        N  = Nh*Np - Nh + 1 # Total number of nodes
+        weight_Qx = get_weight_Qx(N, Nv, w0, Qx)
+    
+        alpha_mat, beta_mat, Anorm_vec = get_mat_vec_v0(Nv, tau)
+    
+        alpha_t0 = get_alpha_t0(weight_Qx, rho)
+        beta_t_tau = get_beta_T(Nv, weight_Qx);
+        atemp = alpha_t0
+        btemp = beta_t_tau
+    
+        Anorm_vec[1] = norm(alpha_t0)
+    
+        alpha_mat, Anorm_vec, atemp = forward_v2(alpha_mat, atemp, tau, x_record, Lambdas, Qx, dt, xref, e_norm, interpo_xs, Np, w0, Anorm_vec)
+        Anorm_vec[tau+2] = sum(btemp .* atemp)
+        atemp = atemp ./ Anorm_vec[end]
+        return -sum(log.(Anorm_vec[2:tau+1])) # Eq. (41), the negative sign, change maximum to minimum
+    end
+    results = optimize(x->loglikelihood(first(x)), [D_init], LBFGS())
+    return results
+end
+
 function backward_with_betamatrix(LQ::Array{Float64,1}, dt::Float64, Nv::Int64, beta_mat::Array{Float64,2}, 
     btemp::Array{Float64,1}, tau::Int64, x_record::Array{Float64,2}, alpha_mat::Array{Float64,2}, 
     xref::Array{Float64,2},e_norm::Float64, interpo_xs::Array{Float64,1}, Np::Int64, w0::Array{Float64,2}, 
@@ -389,36 +438,6 @@ function backward_with_betamatrix(LQ::Array{Float64,1}, dt::Float64, Nv::Int64, 
     end
     return exp_ab_mat, beta_mat
 end
-
-
-function get_all_likelihood(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, peq::Array{Float64,2}, D::Float64, 
-    Nv::Int64, tau::Int64, x_record::Array{Float64,2}, dt::Float64)
-    e_norm, interpo_xs, xref, w0 = initialize(Nh, Np, xratio, xavg)
-    LQ, Qx, rho = fem_solve_eigen_by_pref(Nh, Np, xratio, xavg, peq, D, Nv)
-
-    alpha_t0 = get_alpha_t0(w0, rho, Qx, Nv)
-    beta_t_tau = get_beta_t_tau(w0, rho, Qx, Nv)
-    atemp = alpha_t0
-    btemp = beta_t_tau
-
-    alpha_mat, beta_mat, Anorm_vec = get_mat_vec(Nv, tau)
-
-    Anorm_vec[1] = norm(alpha_t0)
-
-    alpha_mat, Anorm_vec, atemp = forward(alpha_mat, atemp, tau, x_record, LQ, Qx, dt, xref, e_norm, interpo_xs, Np, w0, Anorm_vec)
-
-    Anorm_vec[tau+2] = sum(btemp .* atemp)
-    atemp = atemp ./ Anorm_vec[end]
-    
-    exp_ab_mat, beta_mat = backward_with_betamatrix(LQ, dt, Nv, beta_mat, btemp, tau, x_record, alpha_mat, xref, e_norm, interpo_xs, Np, w0, Qx, Anorm_vec)
-
-    #log_likelihood = -sum(log.(Anorm_vec)) # Eq. (41)
-    #likelihood = exp(log_likelihood) # Positive overflow....
-    #Q = get_Q(LQ, dt, alpha_mat, beta_mat, tau)
-    #S = log_likelihood - Q
-    return Anorm_vec
-end
-
 
 function get_Q(LQ::Array{Float64,1}, dt::Float64, alpha_mat::Array{Float64,2}, beta_mat::Array{Float64,2}, tau::Int64)
     container = zeros(1, tau)
