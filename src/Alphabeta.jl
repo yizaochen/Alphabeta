@@ -1,9 +1,9 @@
 module Alphabeta
 
-    export get_alpha_t0_x_by_V0_Veq, get_alpha_by_proj_alphax_to_Qx, proj_vector_from_eigenspace_to_xspace, em_iteration
+    export get_alpha_t0_x_by_V0_Veq, get_alpha_by_proj_alphax_to_Qx, proj_vector_from_eigenspace_to_xspace, em_iteration, complete_em_v0
 
     include("forwardbackward.jl")
-    export get_weight_Qx, get_alpha_t0, get_alpha_t0_x_square_norm, get_beta_T, get_alpha_hat_e_delta_t, get_e_delta_t_y_beta,get_beta_t_tau, get_alpha_t0_x_square_norm, forward_backward_v0, forward_backward_v1, forward_backward_v2,get_normalized_beta, get_posterior, get_loglikelihood, optimize_D
+    export get_weight_Qx, get_alpha_t0, get_alpha_t0_x_square_norm, get_beta_T, get_alpha_hat_e_delta_t, get_e_delta_t_y_beta,get_beta_t_tau, get_alpha_t0_x_square_norm, forward_backward_v0, forward_backward_v1, forward_backward_v2,get_normalized_beta, get_posterior, get_loglikelihood, optimize_D, get_power_initial_guess_D
 
     include("abruptdetect.jl")
     export detect_abrupt
@@ -85,5 +85,77 @@ module Alphabeta
 
         return p_container, log_likelihood_records
     end
+
+    function complete_em_v0(max_n_iteration::Int64, N::Int64, p0::Array{Float64,2}, Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, Nv::Int64, tau::Int64, y_record::Array{Float64,2}, save_freq::Float64, xref::Array{Float64,2}, e_norm::Float64, w0::Array{Float64,2}, f_out_pcontain::String, f_out_d_record::String, f_out_l_record::String)
+        # Initialize container
+        p_container = zeros(Float64, max_n_iteration+1, N)
+        log_likelihood_records = zeros(max_n_iteration+1)
+        D_records = zeros(max_n_iteration+1)
+        
+        # Initialize equilibrium probablity density
+        p_prev = p0  
+        p_container[1, :] = p0 # The first row in container is p0
+        
+        # Initialize diffusion coefficient
+        println("Initialize D......Start")
+        D, log_likelihood, ini_guess_D_info = get_power_initial_guess_D(Nh, Np, xratio, xavg, p0, Nv, tau, y_record, save_freq)
+        println("Initialize D......End")
+        log_likelihood_records[1] = log_likelihood
+        D_records[1] = D
+        
+        # Setting of iteration
+        continue_iter_boolean = true
+        iter_id = 1
+        
+        while continue_iter_boolean
+            println(@sprintf "Iteration-ID: %d" iter_id)
+            # Every 5 iterations, check abrupt change and do smooth
+            if iter_id % 5 == 0
+                abrupt_boolean, idx_larger_than_1 = detect_abrupt(xref[:,1], p_prev[:,1], N, e_norm)
+                p_prev[:,1] = smooth_peq(N, p_prev[:,1], abrupt_boolean, w0, xref)
+            end
+            
+            p_em, log_likelihood = forward_backward_v2(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq)
+            p_em = max.(p_em, 1e-10)   
+            p_container[iter_id+1, :] = p_em    
+            p_prev[:,1] = p_em
+            
+            # Every 5 iterations, Line search for diffusion coefficient
+            if iter_id % 5 == 0
+                opt_D_res = optimize_D(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq)
+                D = Optim.minimizer(opt_D_res)[1]
+                log_likelihood = -Optim.minimum(opt_D_res)[1]
+            end
+            
+            if abs(log_likelihood - log_likelihood_records[iter_id]) < 1e5
+                println("Converged....EM Done.")
+                opt_D_res = optimize_D(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq)
+                D = Optim.minimizer(opt_D_res)[1]
+                log_likelihood = -Optim.minimum(opt_D_res)[1]
+                continue_iter_boolean = false
+            end
+            
+            log_likelihood_records[iter_id+1] = log_likelihood        
+            D_records[iter_id+1] = D
+        
+            iter_id += 1
+        
+            if iter_id > max_n_iteration
+                println("The number of iteration exceeds the setting maximum number!")
+                continue_iter_boolean = false       
+            end  
+        end
     
+        # Output
+        save(f_out_pcontain, "p_container", p_container)
+        println(@sprintf "Write p_container to %s" f_out_pcontain)
+    
+        save(f_out_d_record, "D_records", D_records)
+        println(@sprintf "Write D_records to %s" f_out_d_record)
+    
+        save(f_out_l_record, "log_likelihood_records", log_likelihood_records)
+        println(@sprintf "Write log_likelihood_records to %s" f_out_l_record)
+
+        return ini_guess_D_info, p_container, D_records, log_likelihood_records
+    end
 end
