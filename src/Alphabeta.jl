@@ -1,6 +1,6 @@
 module Alphabeta
 
-    export get_alpha_t0_x_by_V0_Veq, get_alpha_by_proj_alphax_to_Qx, proj_vector_from_eigenspace_to_xspace, em_iteration, complete_em_v0
+    export get_alpha_t0_x_by_V0_Veq, get_alpha_by_proj_alphax_to_Qx, proj_vector_from_eigenspace_to_xspace, em_iteration, complete_em_v0, complete_em_v1
 
     include("forwardbackward.jl")
     export get_weight_Qx, get_alpha_t0, get_alpha_t0_x_square_norm, get_beta_T, get_alpha_hat_e_delta_t, get_e_delta_t_y_beta,get_beta_t_tau, get_alpha_t0_x_square_norm, forward_backward_v0, forward_backward_v1, forward_backward_v2,get_normalized_beta, get_posterior, get_loglikelihood, optimize_D, get_power_initial_guess_D
@@ -98,15 +98,12 @@ module Alphabeta
         
         # Initialize diffusion coefficient
         println("Initialize D......Start")
-        D, log_likelihood, ini_guess_D_info = get_power_initial_guess_D(Nh, Np, xratio, xavg, p0, Nv, tau, y_record, save_freq)
+        D, ini_guess_D_info = get_power_initial_guess_D(Nh, Np, xratio, xavg, p0, Nv, tau, y_record, save_freq)
         println("Initialize D......End")
-        log_likelihood_records[1] = log_likelihood
-        D_records[1] = D
         
         # Setting of iteration
         continue_iter_boolean = true
-        iter_id = 1
-        
+        iter_id = 1    
         while continue_iter_boolean
             println(@sprintf "Iteration-ID: %d" iter_id)
             # Every 5 iterations, check abrupt change and do smooth
@@ -117,8 +114,17 @@ module Alphabeta
             
             p_em, log_likelihood = forward_backward_v2(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq)
             p_em = max.(p_em, 1e-10)   
-            p_container[iter_id+1, :] = p_em    
             p_prev[:,1] = p_em
+
+            # Record peq, D, log_likelihood
+            p_container[iter_id+1, :] = p_em
+            D_records[iter_id] = D
+            log_likelihood_records[iter_id] = log_likelihood
+
+            if iter_id == 1
+                iter_id += 1     
+                continue
+            end
             
             # Every 5 iterations, Line search for diffusion coefficient
             if iter_id % 5 == 0
@@ -127,25 +133,28 @@ module Alphabeta
                 log_likelihood = -Optim.minimum(opt_D_res)[1]
             end
             
-            if abs(log_likelihood - log_likelihood_records[iter_id]) < 1e5
+            if abs(log_likelihood_records[iter_id] - log_likelihood_records[iter_id-1]) < 1e-1
                 println("Converged....EM Done.")
                 opt_D_res = optimize_D(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq)
                 D = Optim.minimizer(opt_D_res)[1]
                 log_likelihood = -Optim.minimum(opt_D_res)[1]
                 continue_iter_boolean = false
+                D_records[iter_id+1] = D
+                log_likelihood_records[iter_id+1] = log_likelihood   
             end
-            
-            log_likelihood_records[iter_id+1] = log_likelihood        
-            D_records[iter_id+1] = D
         
             iter_id += 1
-        
             if iter_id > max_n_iteration
                 println("The number of iteration exceeds the setting maximum number!")
-                continue_iter_boolean = false       
-            end  
+                opt_D_res = optimize_D(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq)
+                D = Optim.minimizer(opt_D_res)[1]
+                log_likelihood = -Optim.minimum(opt_D_res)[1]
+                continue_iter_boolean = false
+                D_records[iter_id] = D
+                log_likelihood_records[iter_id] = log_likelihood   
+            end
         end
-    
+
         # Output
         save(f_out_pcontain, "p_container", p_container)
         println(@sprintf "Write p_container to %s" f_out_pcontain)
@@ -158,4 +167,5 @@ module Alphabeta
 
         return ini_guess_D_info, p_container, D_records, log_likelihood_records
     end
+
 end

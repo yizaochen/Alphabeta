@@ -396,11 +396,23 @@ function get_power_initial_guess_D(Nh::Int64, Np::Int64, xratio::Int64, xavg::In
     min_idx = argmin(l_container[:])
     min_idx_left = min_idx - 1
     min_idx_right = min_idx + 1
-    if l_container[min_idx_right] > l_container[min_idx_left]
-        return D_array[min_idx_right], l_container[min_idx_right], (D_array, l_container)
-    else
-        return D_array[min_idx_left], l_container[min_idx_left], (D_array, l_container)
+
+    if (min_idx == 1) | (min_idx == 14)
+        return D_array[min_idx], (D_array, l_container)
     end
+
+    if l_container[min_idx_right] > l_container[min_idx_left]
+        return D_array[min_idx_right], (D_array, l_container)
+    else
+        return D_array[min_idx_left], (D_array, l_container)
+    end
+end
+
+function get_initial_D_loglikelihood(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, peq::Array{Float64,2}, Nv::Int64, tau::Int64, x_record::Array{Float64,2}, dt::Float64)
+    power = 9
+    D_test = 10^(float(power))
+    loglikelihood = get_loglikelihood(Nh, Np, xratio, xavg, peq, D_test, Nv, tau, x_record, dt)
+    return D_test, loglikelihood
 end
 
 function optimize_D(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, peq::Array{Float64,2}, D_init::Float64, 
