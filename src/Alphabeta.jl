@@ -1,9 +1,10 @@
 module Alphabeta
 
-    export get_alpha_t0_x_by_V0_Veq, get_alpha_by_proj_alphax_to_Qx, proj_vector_from_eigenspace_to_xspace, em_iteration, complete_em_v0, complete_em_v1
+    export get_alpha_t0_x_by_V0_Veq, get_alpha_by_proj_alphax_to_Qx, proj_vector_from_eigenspace_to_xspace, em_iteration, complete_em_v0
 
     include("forwardbackward.jl")
-    export get_weight_Qx, get_alpha_t0, get_alpha_t0_x_square_norm, get_beta_T, get_alpha_hat_e_delta_t, get_e_delta_t_y_beta,get_beta_t_tau, get_alpha_t0_x_square_norm, forward_backward_v0, forward_backward_v1, forward_backward_v2,get_normalized_beta, get_posterior, get_loglikelihood, optimize_D, get_power_initial_guess_D
+    export get_weight_Qx, get_alpha_t0, get_alpha_t0_x_square_norm, get_beta_T, get_alpha_hat_e_delta_t, get_e_delta_t_y_beta,get_beta_t_tau, get_alpha_t0_x_square_norm, forward_backward_v0, forward_backward_v1, forward_backward_v2,get_normalized_beta, get_posterior, get_loglikelihood, optimize_D
+    export gaussian_kde # from initialization.jl
 
     include("abruptdetect.jl")
     export detect_abrupt
@@ -16,6 +17,8 @@ module Alphabeta
 
     include("plot_util.jl")
     export plot_alpha_t0, plot_alpha_t0_e_dt, plot_photon_mat, plot_alpha_hat, plot_alpha_hat_e_dt, plot_beta_T, plot_beta_T_minus_1, plot_beta_hat_posterior
+
+    
 
     using Printf, JLD
 
@@ -86,20 +89,21 @@ module Alphabeta
         return p_container, log_likelihood_records
     end
 
-    function complete_em_v0(max_n_iteration::Int64, N::Int64, p0::Array{Float64,2}, Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, Nv::Int64, tau::Int64, y_record::Array{Float64,2}, save_freq::Float64, xref::Array{Float64,2}, e_norm::Float64, w0::Array{Float64,2}, f_out_pcontain::String, f_out_d_record::String, f_out_l_record::String)
+    function complete_em_v0(max_n_iteration::Int64, N::Int64, Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, Nv::Int64, tau::Int64, y_record::Array{Float64,2}, save_freq::Float64, xref::Array{Float64,2}, e_norm::Float64, w0::Array{Float64,2}, f_out_pcontain::String, f_out_d_record::String, f_out_l_record::String)
         # Initialize container
         p_container = zeros(Float64, max_n_iteration+1, N)
         log_likelihood_records = zeros(max_n_iteration+1)
         D_records = zeros(max_n_iteration+1)
         
         # Initialize equilibrium probablity density
+        σ = 1 / sqrt(2 * 0.5)
+        p0 = gaussian_kde(xref, y_record, σ, w0)
         p_prev = p0  
         p_container[1, :] = p0 # The first row in container is p0
         
         # Initialize diffusion coefficient
-        println("Initialize D......Start")
-        D, ini_guess_D_info = get_power_initial_guess_D(Nh, Np, xratio, xavg, p0, Nv, tau, y_record, save_freq)
-        println("Initialize D......End")
+        a = 50 # unit: Å
+        D = get_D_by_Stokes_Einstein_relation(a)
         
         # Setting of iteration
         continue_iter_boolean = true
@@ -165,7 +169,7 @@ module Alphabeta
         save(f_out_l_record, "log_likelihood_records", log_likelihood_records)
         println(@sprintf "Write log_likelihood_records to %s" f_out_l_record)
 
-        return ini_guess_D_info, p_container, D_records, log_likelihood_records
+        return p_container, D_records, log_likelihood_records
     end
 
 end
