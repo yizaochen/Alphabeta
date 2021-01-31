@@ -54,6 +54,7 @@ function get_D_by_Stokes_Einstein_relation(a::Float64)
     kBT = 4.11e-21 # unit: J,   T=298K
     a = a * 1e-10  # Convert from Å to m
     η = 9e-4 # water viscosity, unit: Pa⋅s
-    D = kBT / (6π * (η * a))
+    D = kBT / (6π * (η * a)) # unit: m^2/s
+    D = D * 1e20 # unit: Å^2/s
     return D
 end

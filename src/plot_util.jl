@@ -1,4 +1,17 @@
 using PyPlot, Printf, PyCall
+
+function plot_x_Qx_lambda(ax::PyCall.PyObject, idx_eigvector::Int64, LQ::Array{Float64,1}, Qx::Array{Float64,2}, xref::Array{Float64,2})
+    lambda = LQ[idx_eigvector] 
+    tau = 1 / lambda
+    title = @sprintf "\$ \\lambda_{%d}=%.2E \$  \$ \\tau=%.2E \$" idx_eigvector lambda tau 
+    xlabel = "x position"
+    ylabel = @sprintf "\$ \\psi_{%d}(x) \$" idx_eigvector
+    
+    ax.plot(xref, Qx[:, idx_eigvector])
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+end
     
 function plot_alpha_t0(xref::Array{Float64,2}, V_eq::Array{Float64,2}, k_ref::Float64, peq::Array{Float64,2}, w0::Array{Float64,2}, rho_eq::Array{Float64,2}, alpha_t0_x::Array{Float64,2}, alpha_t0_norm::Float64, alpha_t0::Array{Float64,2})
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12,8))
