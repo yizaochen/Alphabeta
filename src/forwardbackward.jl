@@ -2,7 +2,7 @@ using Fretem, LinearAlgebra, SparseArrays, PhotonOperator, Optim, LineSearches
 include("initialization.jl")
 
 
-function initialize(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64)
+function initialize(Nh::Int64, Np::Int64, xratio::Float64, xavg::Float64)
     x, w, Ldx, L = getLagrange(Np, xratio/Nh)
     e_norm = x[end] - x[1]
     interpo_xs = x .+ x[end]
@@ -89,7 +89,7 @@ end
 function forward_v0(alpha_mat::Array{Float64,2}, atemp::Array{Float64,2}, tau::Int64, x_record::Array{Float64,2}, 
     LQ::Array{Float64,1}, Qx::Array{Float64,2}, dt::Float64, xref::Array{Float64,2}, e_norm::Float64, 
     interpo_xs::Array{Float64,1}, Np::Int64,  w0::Array{Float64,2}, Anorm_vec::Array{Float64,2})
-    k_photon = 3 # unit: kcal/mol/angstrom^2
+    k_photon = 5000 # unit: kcal/mol/angstrom^2
     expLQDT = exp.(-LQ .* dt)
     alpha_mat[:, 1] = atemp
     for alpha_idx in 1:tau
@@ -115,7 +115,7 @@ end
 function forward_v1(alpha_mat::Array{Float64,2}, atemp::Array{Float64,2}, tau::Int64, x_record::Array{Float64,2}, 
     LQ::Array{Float64,1}, Qx::Array{Float64,2}, dt::Float64, xref::Array{Float64,2}, e_norm::Float64, 
     interpo_xs::Array{Float64,1}, Np::Int64,  w0::Array{Float64,2}, Anorm_vec::Array{Float64,2})
-    k_photon = 3 # unit: kcal/mol/angstrom^2
+    k_photon = 5000 # unit: kcal/mol/angstrom^2
     expLQDT = exp.(-LQ .* dt)
     alpha_mat[:, 1] = atemp # Record <alpha_0
     prev_ahat_edt = get_alpha_hat_e_delta_t_v1(expLQDT, atemp) # < alpha_0 | exp(-H dt)
@@ -138,8 +138,8 @@ end
 
 function forward_v2(alpha_mat::Array{Float64,2}, atemp::Array{Float64,2}, tau::Int64, x_record::Array{Float64,2}, 
     LQ::Array{Float64,1}, Qx::Array{Float64,2}, dt::Float64, xref::Array{Float64,2}, e_norm::Float64, 
-    interpo_xs::Array{Float64,1}, Np::Int64,  w0::Array{Float64,2}, Anorm_vec::Array{Float64,2})
-    k_photon = 3 # unit: kcal/mol/angstrom^2
+    interpo_xs::Array{Float64,1}, Np::Int64,  w0::Array{Float64,2}, Anorm_vec::Array{Float64,2}, k_photon::Float64)
+    #k_photon = 5000 # unit: kcal/mol/angstrom^2
     expLQDT = exp.(-LQ .* dt)
     alpha_mat[:, 1] = atemp
     for alpha_idx in 1:tau
@@ -226,8 +226,8 @@ end
 
 function backward_v2(LQ::Array{Float64,1}, dt::Float64, Nv::Int64, beta_mat::Array{Float64,2}, btemp::Array{Float64,2},
     tau::Int64, x_record::Array{Float64,2}, alpha_mat::Array{Float64,2}, xref::Array{Float64,2}, e_norm::Float64,
-    interpo_xs::Array{Float64,1}, Np::Int64, w0::Array{Float64,2}, Qx::Array{Float64,2}, Anorm_vec::Array{Float64,2})
-    k_photon = 3 # unit: kcal/mol/angstrom^2
+    interpo_xs::Array{Float64,1}, Np::Int64, w0::Array{Float64,2}, Qx::Array{Float64,2}, Anorm_vec::Array{Float64,2}, k_photon::Float64)
+    #k_photon = 5000 # unit: kcal/mol/angstrom^2
     LQ_diff_ij = get_LQ_diff_ij(Nv, LQ) # Eq. (63) in JPCB 2013
 
     expLQDT = exp.(-LQ .* dt)
@@ -328,8 +328,8 @@ function forward_backward_v1(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, p
     return peq_new_normalize, log_likelihood
 end
 
-function forward_backward_v2(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, peq::Array{Float64,2}, D::Float64, 
-    Nv::Int64, tau::Int64, x_record::Array{Float64,2}, dt::Float64)
+function forward_backward_v2(Nh::Int64, Np::Int64, xratio::Float64, xavg::Float64, peq::Array{Float64,2}, D::Float64, 
+    Nv::Int64, tau::Int64, x_record::Array{Float64,2}, dt::Float64, k_photon::Float64)
     e_norm, interpo_xs, xref, w0 = initialize(Nh, Np, xratio, xavg)
     Lambdas, Qx, rho = fem_solve_eigen_by_pref(Nh, Np, xratio, xavg, peq, D, Nv)
     N  = Nh*Np - Nh + 1 # Total number of nodes
@@ -345,12 +345,12 @@ function forward_backward_v2(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, p
 
     Anorm_vec[1] = norm(alpha_t0)
 
-    alpha_mat, Anorm_vec, atemp = forward_v2(alpha_mat, atemp, tau, x_record, Lambdas, Qx, dt, xref, e_norm, interpo_xs, Np, w0, Anorm_vec)
+    alpha_mat, Anorm_vec, atemp = forward_v2(alpha_mat, atemp, tau, x_record, Lambdas, Qx, dt, xref, e_norm, interpo_xs, Np, w0, Anorm_vec, k_photon)
     Anorm_vec[tau+2] = sum(btemp .* atemp)
     atemp = atemp ./ Anorm_vec[end]
     log_likelihood = sum(log.(Anorm_vec[2:tau+1])) # Eq. (41)
 
-    exp_ab_mat, beta_mat = backward_v2(Lambdas, dt, Nv, beta_mat, btemp, tau, x_record, alpha_mat, xref, e_norm, interpo_xs, Np, w0, Qx, Anorm_vec)
+    exp_ab_mat, beta_mat = backward_v2(Lambdas, dt, Nv, beta_mat, btemp, tau, x_record, alpha_mat, xref, e_norm, interpo_xs, Np, w0, Qx, Anorm_vec, k_photon)
 
     # Eq. (72) and Eq. (78)
     peq_new = diag(Qx * exp_ab_mat * Qx')
@@ -419,7 +419,7 @@ function backward_with_betamatrix(LQ::Array{Float64,1}, dt::Float64, Nv::Int64, 
     btemp::Array{Float64,1}, tau::Int64, x_record::Array{Float64,2}, alpha_mat::Array{Float64,2}, 
     xref::Array{Float64,2},e_norm::Float64, interpo_xs::Array{Float64,1}, Np::Int64, w0::Array{Float64,2}, 
     Qx::Array{Float64,2}, Anorm_vec::Array{Float64,2})
-    k_photon = 3 # unit: kcal/mol/angstrom^2
+    k_photon = 5000 #
     LQ_diff_ij = get_LQ_diff_ij(Nv, LQ) # Eq. (63) in JPCB 2013
 
     expLQDT = exp.(-LQ .* dt)

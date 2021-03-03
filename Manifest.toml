@@ -135,9 +135,9 @@ uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
 [[FileIO]]
 deps = ["Pkg"]
-git-tree-sha1 = "fee8955b9dfa7bec67117ef48085fb2b559b9c22"
+git-tree-sha1 = "83a417f955d8073feb8e7bc8900d6beb0c7b69c2"
 uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
-version = "1.4.5"
+version = "1.5.0"
 
 [[FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
@@ -168,7 +168,7 @@ version = "0.10.16"
 
 [[Fretem]]
 deps = ["Arpack", "LinearAlgebra", "SparseArrays", "Statistics"]
-git-tree-sha1 = "72cb9a536c444bdfd80fe092ae2971834e7a5556"
+git-tree-sha1 = "73031df8188f2678c469cf3d1cc99d126112a943"
 repo-rev = "master"
 repo-url = "https://github.com/yizaochen/Fretem.git"
 uuid = "e84e15ef-c9df-489c-8bae-19309071f75f"
@@ -380,7 +380,7 @@ uuid = "85a6dd25-e78a-55b7-8502-1745935b8125"
 version = "0.2.4"
 
 [[Potential]]
-git-tree-sha1 = "3aada3abfd11b5f6f5bf6c580b0623bf90962fcf"
+git-tree-sha1 = "ef8269c554a913b44f1351208a58381cd0355fb8"
 repo-rev = "master"
 repo-url = "https://github.com/yizaochen/Potential.git"
 uuid = "113ff972-b853-4846-a365-ec05e33f53ce"
