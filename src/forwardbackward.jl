@@ -359,7 +359,7 @@ function forward_backward_v2(Nh::Int64, Np::Int64, xratio::Float64, xavg::Float6
 end
 
 function get_loglikelihood(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, peq::Array{Float64,2}, D::Float64, 
-    Nv::Int64, tau::Int64, x_record::Array{Float64,2}, dt::Float64)
+    Nv::Int64, tau::Int64, x_record::Array{Float64,2}, dt::Float64, k_photon::Float64)
     e_norm, interpo_xs, xref, w0 = initialize(Nh, Np, xratio, xavg)
     Lambdas, Qx, rho = fem_solve_eigen_by_pref(Nh, Np, xratio, xavg, peq, D, Nv)
     N  = Nh*Np - Nh + 1 # Total number of nodes
@@ -375,21 +375,21 @@ function get_loglikelihood(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, peq
 
     Anorm_vec[1] = norm(alpha_t0)
 
-    alpha_mat, Anorm_vec, atemp = forward_v2(alpha_mat, atemp, tau, x_record, Lambdas, Qx, dt, xref, e_norm, interpo_xs, Np, w0, Anorm_vec)
+    alpha_mat, Anorm_vec, atemp = forward_v2(alpha_mat, atemp, tau, x_record, Lambdas, Qx, dt, xref, e_norm, interpo_xs, Np, w0, Anorm_vec, k_photon)
     Anorm_vec[tau+2] = sum(btemp .* atemp)
     atemp = atemp ./ Anorm_vec[end]
     return sum(log.(Anorm_vec[2:tau+1])) # Eq. (41)
 end
 
-function get_initial_D_loglikelihood(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, peq::Array{Float64,2}, Nv::Int64, tau::Int64, x_record::Array{Float64,2}, dt::Float64)
+function get_initial_D_loglikelihood(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, peq::Array{Float64,2}, Nv::Int64, tau::Int64, x_record::Array{Float64,2}, dt::Float64, k_photon::Float64)
     power = 9
     D_test = 10^(float(power))
-    loglikelihood = get_loglikelihood(Nh, Np, xratio, xavg, peq, D_test, Nv, tau, x_record, dt)
+    loglikelihood = get_loglikelihood(Nh, Np, xratio, xavg, peq, D_test, Nv, tau, x_record, dt, k_photon)
     return D_test, loglikelihood
 end
 
-function optimize_D(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, peq::Array{Float64,2}, D_init::Float64, 
-    Nv::Int64, tau::Int64, x_record::Array{Float64,2}, dt::Float64)
+function optimize_D(Nh::Int64, Np::Int64, xratio::Float64, xavg::Float64, peq::Array{Float64,2}, D_init::Float64, 
+    Nv::Int64, tau::Int64, x_record::Array{Float64,2}, dt::Float64, k_photon::Float64)
     function loglikelihood(D)
         e_norm, interpo_xs, xref, w0 = initialize(Nh, Np, xratio, xavg)
         Lambdas, Qx, rho = fem_solve_eigen_by_pref(Nh, Np, xratio, xavg, peq, D, Nv)
@@ -405,7 +405,7 @@ function optimize_D(Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, peq::Array
     
         Anorm_vec[1] = norm(alpha_t0)
     
-        alpha_mat, Anorm_vec, atemp = forward_v2(alpha_mat, atemp, tau, x_record, Lambdas, Qx, dt, xref, e_norm, interpo_xs, Np, w0, Anorm_vec)
+        alpha_mat, Anorm_vec, atemp = forward_v2(alpha_mat, atemp, tau, x_record, Lambdas, Qx, dt, xref, e_norm, interpo_xs, Np, w0, Anorm_vec, k_photon)
         Anorm_vec[tau+2] = sum(btemp .* atemp)
         atemp = atemp ./ Anorm_vec[end]
         return -sum(log.(Anorm_vec[2:tau+1])) # Eq. (41), the negative sign, change maximum to minimum

@@ -56,7 +56,7 @@ module Alphabeta
 
     function em_iteration(n_iteration::Int64, N::Int64, p0::Array{Float64,2}, 
         Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, D::Float64, Nv::Int64, tau::Int64,
-        y_record::Array{Float64,2}, save_freq::Float64, xref::Array{Float64,2}, e_norm::Float64, w0::Array{Float64,2}, f_out_pcontain::String, f_out_l_record::String)
+        y_record::Array{Float64,2}, save_freq::Float64, xref::Array{Float64,2}, e_norm::Float64, w0::Array{Float64,2}, f_out_pcontain::String, f_out_l_record::String, k_photon::Float64)
 
         # Initailize container
         p_container = zeros(Float64, n_iteration+1, N)
@@ -72,7 +72,7 @@ module Alphabeta
                 abrupt_boolean, idx_larger_than_1 = detect_abrupt(xref[:,1], p_prev[:,1], N, e_norm)
                 p_prev[:,1] = smooth_peq(N, p_prev[:,1], abrupt_boolean, w0, xref)
             end
-            p_em, log_likelihood = forward_backward_v2(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq)
+            p_em, log_likelihood = forward_backward_v2(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq, k_photon)
             p_em = max.(p_em, 1e-10)   
             p_container[iter_id+1, :] = p_em    
             p_prev[:,1] = p_em
@@ -89,14 +89,15 @@ module Alphabeta
         return p_container, log_likelihood_records
     end
 
-    function complete_em_v0(max_n_iteration::Int64, N::Int64, Nh::Int64, Np::Int64, xratio::Int64, xavg::Int64, Nv::Int64, tau::Int64, y_record::Array{Float64,2}, save_freq::Float64, xref::Array{Float64,2}, e_norm::Float64, w0::Array{Float64,2}, f_out_pcontain::String, f_out_d_record::String, f_out_l_record::String)
+    function complete_em_v0(max_n_iteration::Int64, N::Int64, Nh::Int64, Np::Int64, xratio::Float64, xavg::Float64, Nv::Int64, tau::Int64, y_record::Array{Float64,2}, save_freq::Float64, xref::Array{Float64,2}, e_norm::Float64, w0::Array{Float64,2}, f_out_pcontain::String, f_out_d_record::String, f_out_l_record::String, k_photon::Float64)
         # Initialize container
         p_container = zeros(Float64, max_n_iteration+1, N)
         log_likelihood_records = zeros(max_n_iteration+1)
         D_records = zeros(max_n_iteration+1)
         
         # Initialize equilibrium probablity density
-        σ = 1 / sqrt(2 * 0.5)
+        k_kde = 0.05 # unit: kcal/mol/angstrom^2
+        σ = 1 / sqrt(2 * k_kde)
         p0 = gaussian_kde(xref, y_record, σ, w0)
         p_prev = p0  
         p_container[1, :] = p0 # The first row in container is p0
@@ -116,7 +117,7 @@ module Alphabeta
                 p_prev[:,1] = smooth_peq(N, p_prev[:,1], abrupt_boolean, w0, xref)
             end
             
-            p_em, log_likelihood = forward_backward_v2(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq)
+            p_em, log_likelihood = forward_backward_v2(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq, k_photon)
             p_em = max.(p_em, 1e-10)   
             p_prev[:,1] = p_em
 
@@ -132,14 +133,14 @@ module Alphabeta
             
             # Every 5 iterations, Line search for diffusion coefficient
             if iter_id % 5 == 0
-                opt_D_res = optimize_D(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq)
+                opt_D_res = optimize_D(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq, k_photon)
                 D = Optim.minimizer(opt_D_res)[1]
                 log_likelihood = -Optim.minimum(opt_D_res)[1]
             end
             
             if abs(log_likelihood_records[iter_id] - log_likelihood_records[iter_id-1]) < 1e-1
                 println("Converged....EM Done.")
-                opt_D_res = optimize_D(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq)
+                opt_D_res = optimize_D(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq, k_photon)
                 D = Optim.minimizer(opt_D_res)[1]
                 log_likelihood = -Optim.minimum(opt_D_res)[1]
                 continue_iter_boolean = false
@@ -150,7 +151,7 @@ module Alphabeta
             iter_id += 1
             if iter_id > max_n_iteration
                 println("The number of iteration exceeds the setting maximum number!")
-                opt_D_res = optimize_D(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq)
+                opt_D_res = optimize_D(Nh, Np, xratio, xavg, p_prev, D, Nv, tau, y_record, save_freq, k_photon)
                 D = Optim.minimizer(opt_D_res)[1]
                 log_likelihood = -Optim.minimum(opt_D_res)[1]
                 continue_iter_boolean = false
